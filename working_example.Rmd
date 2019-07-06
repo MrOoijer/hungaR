@@ -1,0 +1,140 @@
+---
+title: "Matching students to advisers"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. 
+
+What this does is an application of the so called Hungarian method, a deterministic algorithm which finds a minimal matching between two classes of objects. 
+
+There is a choice between two different implementations of this method. One comes from an external package (geogrid), the other one in R and included here. The second one is faster by several factors on larger problems. 
+
+```{r}
+source("my_hungarian.R")
+```
+
+
+## Data entry
+
+Read a table of N students with names and other data.
+
+```{r}
+tmp<- read.csv("./testdata/students.csv", stringsAsFactors = FALSE)
+tmp<- rbind(tmp, tmp, tmp, tmp, tmp)
+students<- data.frame(nr= 1:nrow(tmp), 
+                name= tmp$name, stringsAsFactors = FALSE)
+N<- nrow(students)
+
+```
+Read a table of M advisers with names and max number of slots each has available to supervise studentss.
+
+```{r}
+tmp<- read.csv("./testdata/advisers.csv", stringsAsFactors = FALSE)
+advisers<- data.frame(nr= 1:nrow(tmp), name= tmp$name, max= 5*tmp$max, stringsAsFactors = FALSE)
+M<- nrow(advisers)
+
+```
+Read a table of preferences. For the time being, we assume everybody has 3 first, 2 second and 1 last.
+
+Also assume 1 forbidden combination.
+
+```{r}
+students$pref1<- sample(0:3, N, replace= TRUE)
+students$pref2<- sample(0:3, N, replace= TRUE)
+students$pref2[students$pref2==students$pref1] <- 0
+students$pref3<- sample(0:3, N, replace= TRUE)
+students$pref3[students$pref3==students$pref1] <- 0
+students$pref3[students$pref3==students$pref2] <- 0
+forbidden<- data.frame(student=2, adviser=3)
+```
+
+## Translate data to a format that the algoritm can handle
+
+Now make the first adjacency matrix of N rows and M columns. We are going to maximize, so assign 0 for a normal match, 5-1 for a prefered match and -1000 for a forbidden match.
+
+```{r}
+adj.matrix<- matrix(0, nrow=nrow(students), ncol=nrow(advisers))
+for (i in 1:N){
+  if (students$pref1[i] != 0) adj.matrix[i, students$pref1[i]] <- 5
+  if (students$pref2[i] != 0) adj.matrix[i, students$pref2[i]] <- 3
+  if (students$pref3[i] != 0) adj.matrix[i, students$pref3[i]] <- 1
+}
+
+for (i in 1:nrow(forbidden)) adj.matrix[forbidden$student[i], forbidden$adviser[i]] <- -1000
+```
+
+Now we need to convert this to a square matrix otherwise the hungarian algoritm does not work. First we duplicate each adviser column max times. Then we create some overflow columns per adviser, but those numbers are pinalized. 
+
+```{r}
+sqr.matrix<- matrix(rep(adj.matrix[,1], advisers$max[1]), nrow=N)
+
+for (i in 2:M) sqr.matrix<- cbind(
+  sqr.matrix, 
+  matrix(rep(adj.matrix[,i], advisers$max[i]), nrow=N)
+)
+
+# so we have sum(advisers$max) columns now. There are N students, maybe we need some extra space?  
+
+overflow <- max(3, floor(1+(N - sum(advisers$max))/M))
+
+# add at least 3 copies of adj matrix but with large negative values -100
+
+for (i in 1:overflow)
+  sqr.matrix <- cbind(sqr.matrix, adj.matrix -i*100)
+
+```
+
+Now finally create some dummy students that take reserved links
+
+```{r}
+to_do <- ncol(sqr.matrix) - nrow(sqr.matrix)
+# should be >0
+values <- rep(0, ncol(sqr.matrix))
+
+for(i in 1:to_do) sqr.matrix<- rbind(sqr.matrix, x=values)
+
+```
+
+## Get the result and translate back to our situation.
+
+Now we are going to minimize using the hungarian algoritm.
+
+```{r}
+system.time(
+  {
+  
+    aresult <- geogrid:::hungariansafe_cc(-sqr.matrix)}
+)
+system.time(
+{ 
+    bresult<- my_hungarian(-sqr.matrix)
+})
+
+sum(aresult*sqr.matrix)-sum(bresult*sqr.matrix) ## should be 0
+
+result <- bresult
+```
+
+I think this is correct. 
+
+```{r}
+which_adviser<- c(
+  unlist( sapply(1:M, function(i)
+    rep(advisers$nr[i], advisers$max[i]))),
+  rep(advisers$nr, overflow))
+
+match <- unlist(sapply(1:N, function(i)
+  return(which_adviser[which(result[i,] >0)])))
+
+values <- unlist(sapply(1:N, function(i)
+  return(sqr.matrix[i, which(result[i,] >0)])))
+
+final.result<- data.frame(
+  nr= students$nr, name=students$name, 
+  adviser= advisers$name[match],
+  value= values
+)
+
+final.result
+```
+
