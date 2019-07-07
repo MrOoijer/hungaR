@@ -1,0 +1,8 @@
+name,value
+param_file,params.csv
+students_file,students.csv
+advisers_file,advisers.csv
+exclude_file,exclude.csv
+overflow_max_advisors,-100
+forbidden_penalty,-1000
+pref_by_adviser,10
