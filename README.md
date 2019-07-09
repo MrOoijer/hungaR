@@ -1,7 +1,16 @@
 # hungaR
 
+Match N students to M advisers to supervise writing their (bachelors) thesis. 
 
-(a) The method of (b) is used to match N students to M advisers to supervise their (bachelors) thesis. This is an iterative process where, after reading in the basic data about students and advisers, the user can assign weights to prefered and non prefered combinations. The software will work out the best matching based on the weights.   
+This is asimple three step precoess.
 
-(b) A pure R implementation of the Hungarian method for the
-minimum cost optimal mathcing problem. The runtime is 10-25 seconds on a 1000 by 1000 problem (assign 1000 jobs to 1000nactors). 
+(1) Read in the data about students, advisers, preference and non-prefered combinations. The software will expect the data in csv files.
+
+(2) Prepare the data in a matrix with weights. Weights can be changed via a parameter file. 
+
+(3) From the matrix of weights we calculate the matching with the highest sum of weights. The result is exported into a csv file. If you do not like the end results, the weights in the parameter file need to be adjusted. The the process in step 2 can be repeated.
+
+The algorithm used is a pure R implementation of the Hungarian method for the
+minimum cost optimal mathcing problem. The method is deterministic, so you will always get the same solution with the same data and weights. 
+
+The runtime is 10-25 seconds on 1000 students. 
