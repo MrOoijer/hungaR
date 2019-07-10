@@ -100,17 +100,17 @@ for(i in 1:to_do) sqr.matrix<- rbind(sqr.matrix, x=values)
 Now we are going to minimize using the hungarian algoritm.
 
 ```{r}
-system.time(
-  {
-  
-    aresult <- geogrid:::hungariansafe_cc(-sqr.matrix)}
-)
+# system.time(
+#   {
+#   
+#     aresult <- geogrid:::hungariansafe_cc(-sqr.matrix)}
+# )
 system.time(
 { 
     bresult<- my_hungarian(-sqr.matrix)
 })
 
-sum(aresult*sqr.matrix)-sum(bresult*sqr.matrix) ## should be 0
+# sum(aresult*sqr.matrix)-sum(bresult*sqr.matrix) ## should be 0
 
 result <- bresult
 ```
