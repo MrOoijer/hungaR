@@ -1,17 +1,12 @@
 
 ## An R implementation of The Hungarian Method 
-## input:  a square cost matrix
-## output: place of minimum match
+## input:  a square cost matrix of "jobs" and "tasks"
+## output: place of minimum match (a 0-1 matrix)
 
-## although this is basically the classical 1953 algorithm, we 
-## skip some refinements because we can use the faster vector operations in R
+## Although this is basically the classical 1953 algorithm, we 
+## use use vector operations in R where possible
 
-## Estimated running time is 0.05 to 0.1 seconds on a 100*100 cost matrix and 
-## 12-25 seconds on a 1000*1000 matrix. On this size of problem it is 3-5
-## times faster than the same algorithm in the geogrid package. That is 
-## a very unexpected result, as that one is written in C++. 
-
-my_hungarian <- function(cost){  
+hungar <- function(cost){  
   # debug= FALSE
   co <- cost
   N <- nrow(co)

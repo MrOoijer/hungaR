@@ -1,140 +1,117 @@
 ---
-title: "Matching students to advisers"
-output: html_notebook
+title: "Matching students to advisers example"
+output:
+  pdf_document: default
+  html_notebook: default
 ---
 
 This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. 
 
-What this does is an application of the so called Hungarian method, a deterministic algorithm which finds a minimal matching between two classes of objects. 
-
-There is a choice between two different implementations of this method. One comes from an external package (geogrid), the other one in R and included here. The second one is faster by several factors on larger problems. 
+This is meant as a working example for student-adviser matching. As this is not a library, you have to copy the source of the function we use. 
 
 ```{r}
-source("my_hungarian.R")
+source("hungar.R")
+source("do_match.R")
 ```
 
 
-## Data entry
+## Read in data
 
-Read a table of N students with names and other data.
+At this moment it looks most elegant to do the data entry in a speadsheet and export/import  the data via csv files. Those three files have a simple structure: nr, name for students, nr, name and max for advisers and a weights table. Other columns are possible but not used in this algorithm.
 
-```{r}
-tmp<- read.csv("./testdata/students.csv", stringsAsFactors = FALSE)
-tmp<- rbind(tmp, tmp, tmp, tmp, tmp)
-students<- data.frame(nr= 1:nrow(tmp), 
-                name= tmp$name, stringsAsFactors = FALSE)
-N<- nrow(students)
+The weights table has as header the names (or nr's) of the advisors, and a row for each student with in the first column a student id (name or nr). Cells can be empty, have a positive weight for student preference and can be marked with a single letter. At this moment we have "F" for a forbidden combination and "G" for a combination where student and adviser do not share a common subject.  
 
-```
-Read a table of M advisers with names and max number of slots each has available to supervise studentss.
+Here we process example files from the testdata folder.
 
 ```{r}
-tmp<- read.csv("./testdata/advisers.csv", stringsAsFactors = FALSE)
-advisers<- data.frame(nr= 1:nrow(tmp), name= tmp$name, max= 5*tmp$max, stringsAsFactors = FALSE)
-M<- nrow(advisers)
 
-```
-Read a table of preferences. For the time being, we assume everybody has 3 first, 2 second and 1 last.
-
-Also assume 1 forbidden combination.
-
-```{r}
-students$pref1<- sample(0:3, N, replace= TRUE)
-students$pref2<- sample(0:3, N, replace= TRUE)
-students$pref2[students$pref2==students$pref1] <- 0
-students$pref3<- sample(0:3, N, replace= TRUE)
-students$pref3[students$pref3==students$pref1] <- 0
-students$pref3[students$pref3==students$pref2] <- 0
-forbidden<- data.frame(student=2, adviser=3)
+weights<- read.csv("./testdata/testoverzicht.csv", header=TRUE,
+                   row.names=1, stringsAsFactors = FALSE)
+students<- read.csv("./testdata/students.csv", 
+                    stringsAsFactors = FALSE)
+advisers<- read.csv("./testdata/advisers.csv", 
+                    stringsAsFactors = FALSE)
 ```
 
-## Translate data to a format that the algoritm can handle
 
-Now make the first adjacency matrix of N rows and M columns. We are going to maximize, so assign 0 for a normal match, 5-1 for a prefered match and -1000 for a forbidden match.
+## Post processing of the weights table
+
+The next step is to replace some of the codes in the weights table by numbers and make the whole table numerical. 
+
 
 ```{r}
-adj.matrix<- matrix(0, nrow=nrow(students), ncol=nrow(advisers))
-for (i in 1:N){
-  if (students$pref1[i] != 0) adj.matrix[i, students$pref1[i]] <- 5
-  if (students$pref2[i] != 0) adj.matrix[i, students$pref2[i]] <- 3
-  if (students$pref3[i] != 0) adj.matrix[i, students$pref3[i]] <- 1
+SUBJECT_MISMATCH = -50
+TOO_MANY_STUDENTS = -100 ## overflow per advisor
+FORBIDDEN_COMBINATION = -1000
+
+
+cost <- weights
+cost[ cost==""] <- 0
+cost[cost=="G"] <- SUBJECT_MISMATCH
+cost[cost=="F"] <- FORBIDDEN_COMBINATION
+for (i in 1:ncol(cost))cost[,i] <-
+      as.numeric(cost[,i])
+
+if(sum(is.na(cost)) > 0){
+  cat("\n\n*** Incomplete conversion")
+  stop
 }
 
-for (i in 1:nrow(forbidden)) adj.matrix[forbidden$student[i], forbidden$adviser[i]] <- -1000
 ```
 
-Now we need to convert this to a square matrix otherwise the hungarian algoritm does not work. First we duplicate each adviser column max times. Then we create some overflow columns per adviser, but those numbers are pinalized. 
+
+
+Now we can do the matching 
+
 
 ```{r}
-sqr.matrix<- matrix(rep(adj.matrix[,1], advisers$max[1]), nrow=N)
+match_table<- do_match(cost, advisers$max, 
+                  penalty = TOO_MANY_STUDENTS)
 
-for (i in 2:M) sqr.matrix<- cbind(
-  sqr.matrix, 
-  matrix(rep(adj.matrix[,i], advisers$max[i]), nrow=N)
+final_result<- data.frame(
+  nr= students$nr[match_table$nr], 
+  name= students$name[match_table$nr], 
+  adviser= advisers$name[match_table$adviser],
+  weight = match_table$value
 )
 
-# so we have sum(advisers$max) columns now. There are N students, maybe we need some extra space?  
-
-overflow <- max(3, floor(1+(N - sum(advisers$max))/M))
-
-# add at least 3 copies of adj matrix but with large negative values -100
-
-for (i in 1:overflow)
-  sqr.matrix <- cbind(sqr.matrix, adj.matrix -i*100)
-
 ```
 
-Now finally create some dummy students that take reserved links
+## You might want to print or save the result
 
 ```{r}
-to_do <- ncol(sqr.matrix) - nrow(sqr.matrix)
-# should be >0
-values <- rep(0, ncol(sqr.matrix))
 
-for(i in 1:to_do) sqr.matrix<- rbind(sqr.matrix, x=values)
+# print or save final result
+# write.csv(final_result, "fr.csv", row.names= FALSE, quote= FALSE)
 
+
+knitr::kable(final_result, col.names= names(final_result), row.names=FALSE, caption="Best Matching")
 ```
 
-## Get the result and translate back to our situation.
+## Diagnostics
 
-Now we are going to minimize using the hungarian algoritm.
-
-```{r}
-# system.time(
-#   {
-#   
-#     aresult <- geogrid:::hungariansafe_cc(-sqr.matrix)}
-# )
-system.time(
-{ 
-    bresult<- my_hungarian(-sqr.matrix)
-})
-
-# sum(aresult*sqr.matrix)-sum(bresult*sqr.matrix) ## should be 0
-
-result <- bresult
-```
-
-I think this is correct. 
+Next look at some other details of the matching.
 
 ```{r}
-which_adviser<- c(
-  unlist( sapply(1:M, function(i)
-    rep(advisers$nr[i], advisers$max[i]))),
-  rep(advisers$nr, overflow))
 
-match <- unlist(sapply(1:N, function(i)
-  return(which_adviser[which(result[i,] >0)])))
+diag1 <- aggregate(final_result[,3], 
+                   by=list(final_result$adviser), 
+                   FUN=length)
+names(diag1)<- c("name", "nr_students")
+diag1<- merge(advisers, diag1, by="name")
 
-values <- unlist(sapply(1:N, function(i)
-  return(sqr.matrix[i, which(result[i,] >0)])))
+knitr::kable(diag1, caption="Adviser load")
 
-final.result<- data.frame(
-  nr= students$nr, name=students$name, 
-  adviser= advisers$name[match],
-  value= values
-)
-
-final.result
+diag2<- final_result[final_result$weight %in%
+              c (0, SUBJECT_MISMATCH, 
+                 FORBIDDEN_COMBINATION),]
+diag2$message <- c("not a prefered adviser",
+                   "subject mismatch",
+                   "forbidden combination")[
+                     match(diag2$weight,
+                             c (0, SUBJECT_MISMATCH, 
+                                FORBIDDEN_COMBINATION))
+                     ]         
+knitr::kable(diag2, caption= "Unfortunate matches")                 
 ```
 

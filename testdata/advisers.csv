@@ -1,5 +1,8 @@
-nr, name, max
-1, prof1, 3
-2, lect1, 2
-3, lect2, 3
-
+name,max
+prof1,4
+prof2,4
+ass1,8
+ass2,8
+ass3,8
+ass4,8
+ass5,8
