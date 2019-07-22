@@ -17,7 +17,9 @@ source("do_match.R")
 
 ## Read in data
 
+
 At this moment it looks most elegant to do the data entry in a speadsheet and export/import  the data via csv files. Those three files have a simple structure: nr, name for students, nr, name and max for advisers and a weights table. Other columns are possible but not used in this algorithm.
+
 
 The weights table has as header the names (or nr's) of the advisors, and a row for each student with in the first column a student id (name or nr). Cells can be empty, have a positive weight for student preference and can be marked with a single letter. At this moment we have "F" for a forbidden combination and "G" for a combination where student and adviser do not share a common subject.  
 
