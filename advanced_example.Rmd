@@ -1,0 +1,234 @@
+---
+title: "Matching students to advisers advanced example"
+output:
+  pdf_document: default
+  html_notebook: default
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. 
+
+This is meant as a more advanced working example for student-adviser matching. There are three basic entities: topics, advisors and students. Students match to an adviser via 1 of the 9 topics. For some topics the language of the thesis and/or the working group is fixed in advance. Others are left "open", but in the end we want to have one suitable language in a wg. 
+
+## Needed software
+
+```{r}
+source("hungar.R")
+source("do_match.R")
+```
+
+## Read in data
+
+Data about advisoers, topics, students and student-preferences. At this moment the data about students is also in the student preferences file. Be careful: the seperator now is a semi-colon but if you change the files with excel (or so), it might also hange the seperator. 
+
+
+```{r}
+SEP= ";"
+student_preferences<- read.csv(
+  "./testdata/advanced/student_preferences.csv",
+  header=TRUE, stringsAsFactors = FALSE, sep= SEP)
+topics<- read.csv(
+  "./testdata/advanced/topics.csv", 
+                    stringsAsFactors = FALSE, sep= SEP)
+advisers<- read.csv(
+  "./testdata/advanced/advisers.csv", 
+                    stringsAsFactors = FALSE, sep= SEP)
+
+students<- student_preferences[,1:2]
+
+```
+
+
+## Post processing until we have a weights table table
+
+Do the following steps.
+
+1.  Zero all entries for which the students language does not match the topic wg or scr language.
+
+2.  Add half a point to student topic choices of their prefered language.
+
+3.  Make the N times M matrix where each entry is the maximum of the preferences of the student for that adviser. 
+Remember which topic.
+
+4.  You might enter some other conditions.
+
+## Writing as a function
+
+We want workgroups with one language, so later on we have to run the matching multiple times with different choices for the workgroups. So lets write a function that presents those results.
+
+```{r}
+LANGUAGE_MISMATCH = -10
+LANGUAGE_BONUS = 0.5
+TOO_MANY_STUDENTS = -100 ## overflow per advisor
+FORBIDDEN_COMBINATION = -1000
+SQUEEZE_POWER = 2 ## see below for more explanations
+
+fixed_lang <- function(d2,d3,d4, topics){
+  topics[3:8, 4] <- c(d2,d2,d3,d3,d4,d4)
+      
+    student_topic<- student_preferences[, 3:11]
+    a<- topics$scr_lang == "EN"
+    b<- student_preferences$scr_lang == "NL"
+    student_topic[b,a] <- LANGUAGE_MISMATCH
+    
+    a<- topics$scr_lang == "NL"
+    b<- student_preferences$scr_lang == "EN"
+    student_topic[b,a] <- LANGUAGE_MISMATCH
+    
+    a<- topics$wg_lang == "EN"
+    b<- student_preferences$wg_lang == "NL"
+    student_topic[b,a] <- LANGUAGE_MISMATCH
+    
+    a<- topics$wg_lang == "NL"
+    b<- student_preferences$wg_lang == "EN"
+    student_topic[b,a] <- LANGUAGE_MISMATCH
+    
+    # bonus point for language preferences
+    
+    a<- topics$scr_lang == "EN"
+    b<- student_preferences$scr_lang %in%  c("EN", "VE")
+    student_topic[b,a] <- student_topic[b,a] + LANGUAGE_BONUS
+    a<- topics$scr_lang == "NL"
+    b<- student_preferences$scr_lang %in%  c("NL", "VN")
+    student_topic[b,a] <- student_topic[b,a] + LANGUAGE_BONUS
+    a<- topics$wg_lang == "EN"
+    b<- student_preferences$wg_lang %in%  c("EN", "VE")
+    student_topic[b,a] <- student_topic[b,a] + LANGUAGE_BONUS
+    a<- topics$wg_lang == "NL"
+    b<- student_preferences$wg_lang %in%  c("NL", "VN")
+    student_topic[b,a] <- student_topic[b,a] + LANGUAGE_BONUS
+    
+   # negative bonus point for language preferences
+    
+    a<- topics$scr_lang == "NL"
+    b<- student_preferences$scr_lang %in%  c("EN", "VE")
+    student_topic[b,a] <- student_topic[b,a] - LANGUAGE_BONUS
+    a<- topics$scr_lang == "EN"
+    b<- student_preferences$scr_lang %in%  c("NL", "VN")
+    student_topic[b,a] <- student_topic[b,a] - LANGUAGE_BONUS
+    a<- topics$wg_lang == "NL"
+    b<- student_preferences$wg_lang %in%  c("EN", "VE")
+    student_topic[b,a] <- student_topic[b,a] - LANGUAGE_BONUS
+    a<- topics$wg_lang == "EN"
+    b<- student_preferences$wg_lang %in%  c("NL", "VN")
+    student_topic[b,a] <- student_topic[b,a] - LANGUAGE_BONUS
+
+    # collapse per advisor; not generic code yet
+    
+    cost<- student_topic[, 1:5] # just for the size
+    names(cost)<- advisers$name
+    mem_s_t <- cost #idem
+    
+    for (j in 1:4){
+      range2 <- 2*j
+      range1 <- range2-1
+      up <- pmax(student_topic[, range1],
+                         student_topic[, range2])
+      cost[, j ] <- up
+      mem_s_t[, j] <- ifelse(
+        up== student_topic[, range1], range1, range2)
+      
+    }
+    cost[, 5] <- student_topic[,9]
+    mem_s_t[, 5] <- 9
+
+    # force unpopular docet1 to get 8 students
+    # cost<- cost-1
+    # cost[,1]<- cost[,1] +5
+    # 
+    match_table<- do_match(cost, advisers$max, 
+                  penalty = TOO_MANY_STUDENTS, 
+                  squeeze_power = SQUEEZE_POWER)
+    match_table$topic = sapply(match_table$nr, function(i) 
+    mem_s_t[i, match_table$adviser[i]])
+    
+    
+    return(match_table)
+}
+
+
+```
+
+Now, later we will uncover the best language choice, but here just show the best result.
+
+There is one more parameter at play here: SQUEEZE_POWER. Explanation:
+
+Giving almost all students their prefered advisor but one student his/her least prefered advisor night raise some eyebrows, even though it maximizes the sum of values. If that effect is too gross, the high values can be "squeezed down" a little bit so that for instance 8 eights will weight more than 7 nines and 1 one. SQUEEZE_POWER of 1 is normal behaviour, use 2-10 for strong(er) equlizing effects.
+
+In this example it does not make any difference, because the random characteristic of the preferences. 
+
+
+```{r}
+match_table<- fixed_lang("NL", "NL","NL", topics)
+
+final_result<- data.frame(
+  nr= students$nr[match_table$nr], 
+  name= students$name[match_table$nr], 
+  adviser= advisers$name[match_table$adviser],
+  topic = match_table$topic, 
+  weight = match_table$value
+)
+
+```
+
+## You might want to print or save the result
+
+```{r}
+
+# print or save final result
+# write.csv(final_result, "fr.csv", row.names= FALSE, quote= FALSE)
+
+print(sum(final_result$weight))
+
+knitr::kable(final_result, col.names= names(final_result), row.names=FALSE, caption="Best Matching")
+```
+
+## Diagnostics
+
+Next look at some other details of the matching.
+
+```{r}
+
+diag1 <- aggregate(final_result[,3], 
+                   by=list(final_result$adviser), 
+                   FUN=length)
+names(diag1)<- c("name", "nr_students")
+diag1<- merge(advisers, diag1, by="name")
+
+knitr::kable(diag1, caption="Adviser load")
+
+
+##### check languages
+
+diag2<- final_result[order(final_result$adviser, 
+                           final_result$topic), c(3:4, 1:2,5)]
+diag2$scr_lang <- student_preferences$scr_lang[diag2$nr]
+diag2$wg_lang <- student_preferences$wg_lang[diag2$nr]
+
+knitr::kable(diag2, row.names=FALSE, 
+             caption= "Unfortunate matches")                 
+```
+
+Running the above without specifying the workgroup languages led to chaos. That's why we have to fix them, and the code below shows that in this case "EN", "NL", "NL" is the choice with the hoghest score, although some others come close.
+
+```{r}
+  
+
+
+for (d2 in c("EN", "NL"))
+for (d3 in c("EN", "NL"))
+for (d4 in c("EN", "NL")){
+    matched <- fixed_lang(d2, d3, d4, topics)
+    print(c(d2,d3,d4, sum(matched$value)))
+  }
+```
+That concludes our more advanced example. 
+
+## Discussion, Conclusions, summary
+
+Our "random" preferences were skewed on purpose, giving lower numbered topics a lower preferense. As a result docent 1 has fewer students and nobody is assigned to topic 1. If you do not want this, change the max parameters for advisers sch that they sum up to the number of students exactly, then it will be corrected.
+
+The squeeze factor only has effect in the more extreme cases. Even in this example it helps avoiding some lower scores (without affecting the overall scores). So it is recommended to use a squeeze-power of 2 as default. 
+
+MOst of the complexity comes from the language choice of workgroups and thesis. Leaving too many options open makes things more complex. If for a topic the thesis language is Dutch, than it makes little sense to leave the language of the work group open.
+
+Also it is difficult to weigh the language preferences against the topic preferences. What does it mean if a student has a high reference for a topic that is EN only and he/she prefers EN? We put some of that into a parameter called "language_bonus", but it has a strong influence on the results. 

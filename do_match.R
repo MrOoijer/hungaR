@@ -8,7 +8,8 @@
 
 do_match <- function(cost, max_adv
                      , from_elsewhere= FALSE
-                     , penalty = -100){
+                     , penalty = -100
+                     , squeeze_power= 1){
   N<- nrow(cost)
   M<- ncol(cost)
   sqr.matrix<- matrix(rep(cost[,1], max_adv[1]), nrow=N)
@@ -28,10 +29,18 @@ do_match <- function(cost, max_adv
   values <- rep(0, ncol(sqr.matrix))
   for(i in 1:to_do) sqr.matrix<- rbind(sqr.matrix, x=values)
   
+  #transform matrix
+  # sq <- sqr.matrix
+  sq <- (sign(sqr.matrix > 0) * abs(sqr.matrix)^(1/squeeze_power)) +
+    + (sign(sqr.matrix < 0) * sqr.matrix)
+  # if (squeeze_power > 0) sq <- (sign(sqr.matrix > 0) * squeeze_power * 
+  #                                 log1p(abs(sqr.matrix))) +
+  #   (sign(sqr.matrix < 0) * sqr.matrix)
+ 
   # so now its square and do the match
   if(from_elsewhere && require(geogrid))
-    result <- geogrid:::hungariansafe_cc(-sqr.matrix) else
-      result<- hungar(-sqr.matrix)
+    result <- geogrid:::hungariansafe_cc(-sq) else
+      result<- hungar(-sq)
   
   # which advisor belongs to which column
   which_adviser<- c(

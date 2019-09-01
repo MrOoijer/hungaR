@@ -1,5 +1,5 @@
 ---
-title: "Matching students to advisers example"
+title: "Matching students to advisers basic example"
 output:
   pdf_document: default
   html_notebook: default
@@ -7,7 +7,7 @@ output:
 
 This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. 
 
-This is meant as a working example for student-adviser matching. As this is not a library, you have to copy the source of the function we use. 
+This is meant as a basic working example for student-adviser matching. As this is not a library, we have to copy the source of the function we use. 
 
 ```{r}
 source("hungar.R")
@@ -27,11 +27,11 @@ Here we process example files from the testdata folder.
 
 ```{r}
 
-weights<- read.csv("./testdata/testoverzicht.csv", header=TRUE,
+weights<- read.csv("./testdata/basic/testoverzicht.csv", header=TRUE,
                    row.names=1, stringsAsFactors = FALSE)
-students<- read.csv("./testdata/students.csv", 
+students<- read.csv("./testdata/basic/students.csv", 
                     stringsAsFactors = FALSE)
-advisers<- read.csv("./testdata/advisers.csv", 
+advisers<- read.csv("./testdata/basic/advisers.csv", 
                     stringsAsFactors = FALSE)
 ```
 
@@ -45,7 +45,7 @@ The next step is to replace some of the codes in the weights table by numbers an
 SUBJECT_MISMATCH = -50
 TOO_MANY_STUDENTS = -100 ## overflow per advisor
 FORBIDDEN_COMBINATION = -1000
-
+SQUEEZE_POWER = 4 ## see below for more exlanations
 
 cost <- weights
 cost[ cost==""] <- 0
@@ -61,14 +61,17 @@ if(sum(is.na(cost)) > 0){
 
 ```
 
+Now we can do the matching. There is one more parameter at play here: SQUEEZE_POWER. Explanation:
 
+Giving almost all students their prefered advisor but one student his/her least prefered advisor night raise some eyebrows, even though it maximizes the sum of values. If that effect is too gross, the high values can be "squeezed down" a little bit so that for instance 8 eights will weight more than 7 nines and 1 one. SQUEEZE_POWER of 1 is normal behaviour, use 2-10 for strong(er) equlizing effects.
 
-Now we can do the matching 
+In this example 6 students will not have a prefered advisor. After increasing this factor to 4 we have only 2 such students left and setting SQUEEZE_POWER to 9 there is none. 
 
 
 ```{r}
 match_table<- do_match(cost, advisers$max, 
-                  penalty = TOO_MANY_STUDENTS)
+                  penalty = TOO_MANY_STUDENTS, 
+                  squeeze_power = SQUEEZE_POWER)
 
 final_result<- data.frame(
   nr= students$nr[match_table$nr], 

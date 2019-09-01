@@ -1,0 +1,10 @@
+nr;name;scr_lang;wg_lang;docent
+1;topc1;EN;EN;1
+2;topic2;EN;EN;1
+3;topic3;;;2
+4;topic4;;;2
+5;topic5;;;3
+6;topic6;;;3
+7;topic7;NL;;4
+8;topic8;;;4
+9;topc9;EN;EN;5
