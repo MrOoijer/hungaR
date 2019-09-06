@@ -46,8 +46,8 @@ student_preferences <- data.frame(
 )
 
 # finally the preferences. Turn the table inside out
-df[25, "Choice8"]<- 4
-df[30, "Choice9"]<- 8
+# df[25, "Choice8"]<- 4
+# df[30, "Choice9"]<- 8
 for ( i in 1:nrow(df)) {
   indx= as.integer(substring(df[i, 2:10],1,1))
   student_preferences[i, 2+indx] <- (9:1)
