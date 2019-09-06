@@ -1,0 +1,220 @@
+---
+title: "Matching students to advisers 2019-09-02 data "
+output:
+  pdf_document: default
+  html_notebook: default
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. 
+
+Algorithm on the "real" data.
+
+## Needed software
+
+```{r}
+source("hungar.R")
+source("do_match.R")
+```
+
+## Read in data
+
+Use a separate data conversion
+
+
+```{r}
+source("cvt_2019_09_02.R")
+students<- student_preferences[,1:2]
+
+```
+
+
+## Post processing until we have a useful weights table
+
+Added "tracks" and some refinements. Allocated 11 slots per adviser. Ran many simulations but it was clear that the workgroup languages should be EN, NL, NL, NL, EN.
+
+## Writing as a function
+
+We want workgroups with one language, so later on we have to run the matching multiple times with different choices for the workgroups. So lets write a function that presents those results.
+
+```{r}
+LANGUAGE_MISMATCH = -15
+LANGUAGE_BONUS = 0
+LANGUAGE_MALUS = -7
+TOO_MANY_STUDENTS = -100 ## overflow per advisor
+FORBIDDEN_COMBINATION = -1000
+TRACK_MISMATCH = -10
+SQUEEZE_POWER = 1 ## see below for more explanations
+
+fixed_lang <- function(d2,d3,d4, topics){
+  topics[3:8, 4] <- c(d2,d2,d3,d3,d4,d4)
+  student_topic<- student_preferences[, 3:11]
+    # tracks
+    a<- topics$track == "D"
+    b<- student_preferences$track == "F"
+    student_topic[b,a] <- student_topic[b,a] + TRACK_MISMATCH
+  
+    a<- topics$track == "F"
+    b<- student_preferences$track == "D"
+    student_topic[b,a] <- student_topic[b,a] + TRACK_MISMATCH
+  
+    a<- topics$scr_lang == "EN"
+    b<- student_preferences$scr_lang == "NL"
+    student_topic[b,a] <- student_topic[b,a] + LANGUAGE_MISMATCH
+    
+    a<- topics$scr_lang == "NL"
+    b<- student_preferences$scr_lang == "EN"
+    student_topic[b,a] <- student_topic[b,a] + LANGUAGE_MISMATCH
+    
+    a<- topics$wg_lang == "EN"
+    b<- student_preferences$wg_lang == "NL"
+    student_topic[b,a] <- student_topic[b,a] + LANGUAGE_MISMATCH
+    
+    a<- topics$wg_lang == "NL"
+    b<- student_preferences$wg_lang == "EN"
+    student_topic[b,a] <- student_topic[b,a] + LANGUAGE_MISMATCH
+    
+    # bonus point for language preferences
+    
+    a<- topics$scr_lang == "EN"
+    b<- student_preferences$scr_lang %in%  c("EN", "VE")
+    student_topic[b,a] <- student_topic[b,a] + LANGUAGE_BONUS
+    a<- topics$scr_lang == "NL"
+    b<- student_preferences$scr_lang %in%  c("NL", "VN")
+    student_topic[b,a] <- student_topic[b,a] + LANGUAGE_BONUS
+    a<- topics$wg_lang == "EN"
+    b<- student_preferences$wg_lang %in%  c("EN", "VE")
+    student_topic[b,a] <- student_topic[b,a] + LANGUAGE_BONUS
+    a<- topics$wg_lang == "NL"
+    b<- student_preferences$wg_lang %in%  c("NL", "VN")
+    student_topic[b,a] <- student_topic[b,a] + LANGUAGE_BONUS
+    
+   # negative bonus point for language preferences
+    
+    a<- topics$scr_lang == "NL"
+    b<- student_preferences$scr_lang %in%  c("EN", "VE")
+    student_topic[b,a] <- student_topic[b,a] + LANGUAGE_MALUS
+    a<- topics$scr_lang == "EN"
+    b<- student_preferences$scr_lang %in%  c("NL", "VN")
+    student_topic[b,a] <- student_topic[b,a] + LANGUAGE_MALUS
+    a<- topics$wg_lang == "NL"
+    b<- student_preferences$wg_lang %in%  c("EN", "VE")
+    student_topic[b,a] <- student_topic[b,a] + LANGUAGE_MALUS
+    a<- topics$wg_lang == "EN"
+    b<- student_preferences$wg_lang %in%  c("NL", "VN")
+    student_topic[b,a] <- student_topic[b,a] + LANGUAGE_MALUS
+
+    # collapse per advisor; not generic code yet
+    
+    cost<- student_topic[, 1:5] # just for the size
+    names(cost)<- advisers$ID
+    mem_s_t <- cost #idem
+    
+    for (j in 1:4){
+      range2 <- 2*j
+      range1 <- range2-1
+      up <- pmax(student_topic[, range1],
+                         student_topic[, range2])
+      cost[, j ] <- up
+      mem_s_t[, j] <- ifelse(
+        up== student_topic[, range1], range1, range2)
+      
+    }
+    cost[, 5] <- student_topic[,9]
+    mem_s_t[, 5] <- 9
+
+    # force unpopular docet1 to get 8 students
+    # cost<- cost-1
+    # cost[,1]<- cost[,1] +5
+    # 
+    match_table<- do_match(cost, advisers$max, 
+                  penalty = TOO_MANY_STUDENTS, 
+                  squeeze_power = SQUEEZE_POWER)
+    match_table$topic = sapply(match_table$nr, function(i) 
+       mem_s_t[i, match_table$adviser[i]])
+    match_table$input= student_topic
+    
+    return(match_table)
+}
+
+
+```
+
+Now, later we will uncover the best language choice, but here just show the best result.
+
+There is one more parameter at play here: SQUEEZE_POWER. Explanation:
+
+Giving almost all students their prefered advisor but one student his/her least prefered advisor night raise some eyebrows, even though it maximizes the sum of values. If that effect is too gross, the high values can be "squeezed down" a little bit so that for instance 8 eights will weight more than 7 nines and 1 one. SQUEEZE_POWER of 1 is normal behaviour, use 2-10 for strong(er) equlizing effects.
+
+
+
+```{r}
+match_table<- fixed_lang("NL", "NL","NL", topics)
+
+final_result<- data.frame(
+  nr= students$nr[match_table$nr], 
+  ID= students$ID[match_table$nr], 
+  adviser= advisers$ID[match_table$adviser],
+  topic = match_table$topic, 
+  weight = match_table$value
+)
+
+```
+
+## You might want to print or save the result
+
+```{r}
+
+# print or save final result
+# write.csv(final_result, "fr.csv", row.names= FALSE, quote= FALSE)
+
+print(sum(final_result$weight))
+
+f_result <- final_result[order(final_result$weight),]
+
+knitr::kable(final_result, col.names= names(final_result), row.names=FALSE, caption="Best Matching, in order of input")
+knitr::kable(f_result, col.names= names(f_result), row.names=FALSE, caption="Best Matching, ordered by weight")
+```
+
+## Diagnostics
+
+Next look at some other details of the matching.
+
+```{r}
+
+diag1 <- aggregate(final_result[,3], 
+                   by=list(final_result$adviser), 
+                   FUN=length)
+names(diag1)<- c("ID", "nr_students")
+diag1<- merge(advisers, diag1, by="ID")
+
+knitr::kable(diag1, caption="Adviser load")
+
+
+##### check languages
+
+diag2<- final_result[order(final_result$adviser, 
+                           final_result$topic,
+                           final_result$weight), 
+                     c(3:4, 1:2,5)]
+diag2$scr_lang <- student_preferences$scr_lang[diag2$nr]
+diag2$wg_lang <- student_preferences$wg_lang[diag2$nr]
+
+knitr::kable(diag2, row.names=FALSE, 
+             caption= "Best matching, by adviser")                 
+```
+
+Leaving the language of the workgroups undefined gives groups with language confliccts. Thus we have to fix them, and the code below shows that in this case "NL", "NL", "NL" is the choice with the highest score, although some others come close.
+
+```{r}
+  
+
+
+for (d2 in c("EN", "NL"))
+for (d3 in c("EN", "NL"))
+for (d4 in c("EN", "NL")){
+    matched <- fixed_lang(d2, d3, d4, topics)
+    print(c(d2,d3,d4, sum(matched$value)))
+  }
+```
+So that settles the distribution of languages
+
