@@ -98,9 +98,13 @@ There are some inconsistencies, f.i. students in an English language track indic
 
 ```{r}
 # ------ "english tracks are only allowed to write in english analysis"
-change1 <- student_preferences$nr[student_preferences$wg_lang != "EN" &
+change1 <- student_preferences$nr[student_preferences$wg_lang == "NL" &
                          student_preferences$track %in% c("FE", "DE")]
-student_preferences$wg_lang[change1] <- "EN"
+
+corset1<- student_preferences[change1,c(1,2,12,13,14)]
+
+
+student_preferences$wg_lang[change1] <- ""
 
 # # ------- "only-lamguage for wg and scr cannot conflict"
 change2 <- student_preferences$nr[student_preferences$scr_lang == "EN" &
@@ -112,7 +116,7 @@ change4 <- student_preferences$nr[student_preferences$scr_lang == "VN" &
 student_preferences$wg_lang[change4] <- ""
 change5 <- student_preferences$nr[student_preferences$scr_lang == "VE" &
                                     student_preferences$wg_lang == "NL"]
-student_preferences$wg_lang[change5] <- ""
+
 # student 2009735 cant do number 9
 changes6 <- student_preferences$nr[student_preferences$ID == 2009735]
 student_preferences$topic_9[changes6] <-FORBIDDEN_COMBINATION
@@ -121,6 +125,14 @@ student_preferences$topic_9[changes6] <-FORBIDDEN_COMBINATION
 # ------ Finally remove language from track code
 student_preferences$track<- substring(student_preferences$track, 1, 1)
 ```
+
+
+Some attrubutes were changed.
+
+```{r}
+knitr::kable(corset1, row.names = F, caption="Corrected entries")
+```
+
 
 ## The matching function
 
