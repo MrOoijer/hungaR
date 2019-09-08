@@ -1,0 +1,312 @@
+---
+title: "Matching students to advisers 2019-09-06 data"
+output:
+  pdf_document: default
+  html_notebook: default
+  html_document:
+    df_print: paged
+date: "Processed 2019-09-09"
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. 
+
+Algorithm on the "real" data 0f 2019-09-06.
+
+## Load software and set parameters
+
+```{r}
+source("hungar.R")
+source("do_match.R")
+
+TRACK_MISMATCH = -25        ## when the topic is not fit
+                            ## for the student track
+LANGUAGE_MISMATCH = -10     ## when the student is NL or EN only
+                            ## but not supported by topic
+LANGUAGE_BONUS = 0          ## topic in studentss pref lang
+LANGUAGE_MALUS = -7         ## topic NOT in studentss pref lang
+TOO_MANY_STUDENTS = -100    ## overflow penalty per adviser
+FORBIDDEN_COMBINATION = -1000 ## what it says
+
+## standard we just optimize sum of weights, but for advanced
+## purposes we can use other functions for which 
+## this is a parameter
+
+SQUEEZE_POWER = 1 ## default - does nothing
+
+```
+
+## Read in data
+
+The spreadsheet out of the students administartion system was not entirely correct, so had to be corrected manually. We read the csv files that already contain the corrections. 
+
+
+```{r}
+# edited advisers manually
+advisers <- read.csv("./data_2019_09_06/advisers.csv", sep=";", 
+                     stringsAsFactors = FALSE)
+
+# copied teachers tab in xls to csv
+# the name is a bit misleading because it is per topic
+df<- read.csv("./data_2019_09_06/teachers.csv", sep=",", 
+              stringsAsFactors = FALSE)
+# transfer to useful format
+topics <- data.frame(nr=1:9,
+       ID= substr(df$Topic, 1, 21), 
+       scr_lang=  c("EN", "NL", "")[
+         match(df$Language, c("English", "Dutch", "Both"))],
+       wg_lang=c("EN", "EN", rep("",6), "EN"), 
+       docent= df$Teacher_ID-100,
+       full_text= df$Topic, 
+       track= c("D", "F", "")[
+         match(df$Program, c("Developmental", "Forensic", "Both"))],
+       
+       stringsAsFactors = FALSE
+)
+
+## --------- student preferences 
+df<- read.csv("./data_2019_09_06/prefs.csv", sep=",", 
+              stringsAsFactors = FALSE)
+## that table is not yet in a usable format
+topics2 <- as.data.frame(matrix(0, nrow=nrow(df), ncol=9))
+names(topics2) <- paste0("topic_", 1:9)
+d1<- unique(df$Thesis_write_language)
+d1<- d1[order(d1)]; d1T <- c("NL", "EN", "VN", "VE")
+d2<- unique(paste0(df$Dutch_wg, df$Englis_wg))
+d2T<- c("", "NL", "EN")
+d3<- unique(df$Track); d3T <- c("FE", "DN", "FN", "DE")
+student_preferences <- data.frame(
+  nr= 1:nrow(df), 
+  ID= df$Studentnr,
+  topics2, 
+  scr_lang=  d1T[match(df$Thesis_write_language, d1)],
+  wg_lang = d2T[match(paste0(df$Dutch_wg, df$Englis_wg), d2)],
+  track= d3T[match(df$Track, d3)],
+  stringsAsFactors = FALSE
+)
+
+for ( i in 1:nrow(df)) {
+  indx= as.integer(substring(df[i, 2:10],1,1))
+  student_preferences[i, 2+indx] <- (9:1)
+}
+
+
+```
+
+## Check data rules. 
+
+There are some inconsistencies, f.i. students in an English language track indicating preferences for a thesis in Dutch. The following code applies all known rules. 
+
+```{r}
+# ------ "english tracks are only allowed to write in english analysis"
+change1 <- student_preferences$nr[student_preferences$wg_lang != "EN" &
+                         student_preferences$track %in% c("FE", "DE")]
+student_preferences$wg_lang[change1] <- "EN"
+
+# # ------- "only-lamguage for wg and scr cannot conflict"
+change2 <- student_preferences$nr[student_preferences$scr_lang == "EN" &
+                                    student_preferences$wg_lang == "NL"]
+change3 <- student_preferences$nr[student_preferences$scr_lang == "NL" &
+                                    student_preferences$wg_lang == "EN"]
+change4 <- student_preferences$nr[student_preferences$scr_lang == "VN" &
+                                    student_preferences$wg_lang == "EN"]
+student_preferences$wg_lang[change4] <- ""
+change5 <- student_preferences$nr[student_preferences$scr_lang == "VE" &
+                                    student_preferences$wg_lang == "NL"]
+student_preferences$wg_lang[change5] <- ""
+# student 2009735 cant do number 9
+changes6 <- student_preferences$nr[student_preferences$ID == 2009735]
+student_preferences$topic_9[changes6] <-FORBIDDEN_COMBINATION
+
+
+# ------ Finally remove language from track code
+student_preferences$track<- substring(student_preferences$track, 1, 1)
+```
+
+## The matching function
+
+We want workgroups with one language, so we have to run the matching multiple times with different choices for the workgroups. 
+
+```{r}
+fixed_lang <- function(d2,d3,d4, topics){
+  topics[3:8, 4] <- c(d2,d2,d3,d3,d4,d4)
+  student_topic<- student_preferences[, 3:11]
+    # tracks
+    a<- topics$track == "D"
+    b<- student_preferences$track == "F"
+    student_topic[b,a] <- student_topic[b,a] + TRACK_MISMATCH
+  
+    a<- topics$track == "F"
+    b<- student_preferences$track == "D"
+    student_topic[b,a] <- student_topic[b,a] + TRACK_MISMATCH
+  
+    a<- topics$scr_lang == "EN"
+    b<- student_preferences$scr_lang == "NL"
+    student_topic[b,a] <- student_topic[b,a] + LANGUAGE_MISMATCH
+    
+    a<- topics$scr_lang == "NL"
+    b<- student_preferences$scr_lang == "EN"
+    student_topic[b,a] <- student_topic[b,a] + LANGUAGE_MISMATCH
+    
+    a<- topics$wg_lang == "EN"
+    b<- student_preferences$wg_lang == "NL"
+    student_topic[b,a] <- student_topic[b,a] + LANGUAGE_MISMATCH
+    
+    a<- topics$wg_lang == "NL"
+    b<- student_preferences$wg_lang == "EN"
+    student_topic[b,a] <- student_topic[b,a] + LANGUAGE_MISMATCH
+    
+    # bonus point for language preferences
+    
+    a<- topics$scr_lang == "EN"
+    b<- student_preferences$scr_lang %in%  c("EN", "VE")
+    student_topic[b,a] <- student_topic[b,a] + LANGUAGE_BONUS
+    a<- topics$scr_lang == "NL"
+    b<- student_preferences$scr_lang %in%  c("NL", "VN")
+    student_topic[b,a] <- student_topic[b,a] + LANGUAGE_BONUS
+    a<- topics$wg_lang == "EN"
+    b<- student_preferences$wg_lang %in%  c("EN", "VE")
+    student_topic[b,a] <- student_topic[b,a] + LANGUAGE_BONUS
+    a<- topics$wg_lang == "NL"
+    b<- student_preferences$wg_lang %in%  c("NL", "VN")
+    student_topic[b,a] <- student_topic[b,a] + LANGUAGE_BONUS
+    
+   # negative bonus point for language preferences
+    
+    a<- topics$scr_lang == "NL"
+    b<- student_preferences$scr_lang %in%  c("EN", "VE")
+    student_topic[b,a] <- student_topic[b,a] + LANGUAGE_MALUS
+    a<- topics$scr_lang == "EN"
+    b<- student_preferences$scr_lang %in%  c("NL", "VN")
+    student_topic[b,a] <- student_topic[b,a] + LANGUAGE_MALUS
+    a<- topics$wg_lang == "NL"
+    b<- student_preferences$wg_lang %in%  c("EN", "VE")
+    student_topic[b,a] <- student_topic[b,a] + LANGUAGE_MALUS
+    a<- topics$wg_lang == "EN"
+    b<- student_preferences$wg_lang %in%  c("NL", "VN")
+    student_topic[b,a] <- student_topic[b,a] + LANGUAGE_MALUS
+
+    # collapse per advisor; not generic code yet
+    
+    cost<- student_topic[, 1:5] # just for the size
+    names(cost)<- advisers$ID
+    mem_s_t <- cost #idem
+    
+    for (j in 1:4){
+      range2 <- 2*j
+      range1 <- range2-1
+      up <- pmax(student_topic[, range1],
+                         student_topic[, range2])
+      cost[, j ] <- up
+      mem_s_t[, j] <- ifelse(
+        up== student_topic[, range1], range1, range2)
+      
+    }
+    cost[, 5] <- student_topic[,9]
+    mem_s_t[, 5] <- 9
+
+    # force unpopular docet1 to get 8 students
+    # cost<- cost-1
+    # cost[,1]<- cost[,1] +5
+    # 
+    match_table<- do_match(cost, advisers$max, 
+                  penalty = TOO_MANY_STUDENTS,
+                  squeeze_power = SQUEEZE_POWER)
+    match_table$topic = sapply(match_table$nr, function(i) 
+       mem_s_t[i, match_table$adviser[i]])
+    match_table$input= student_topic
+    
+    return(match_table)
+}
+
+
+```
+
+## Eight language options for all workgroups
+
+```{r}
+matched <- list()
+i<- 0
+for (d2 in c("EN", "NL"))
+for (d3 in c("EN", "NL"))
+for (d4 in c("EN", "NL")){
+    i<- i+1
+    m <- fixed_lang(d2, d3, d4, topics) 
+    cat("\n", i, "-", d2,d3,d4, "-", sum(m$value))
+    matched[[i]]<- list(index=paste0(d2,d3,d4), matched=m)
+  }
+```
+
+## Discussion and overview of result
+
+We see that the last result is the best. For the three middle workgroups Dutch is the best workgroup language. There are various ways to check the robustness of the result, f.i. by reordering the student preferences and to see if somebody else will get assigned to a low weight topic.
+
+A second way is to alter the measured objective. That is now the sum of weights, but it could be any additive fucntion. F.i. it could be the sum of sqr roots of weights (with negative weights unchanged), etc. The function do_match can be given alternative functions. We have tried a couple, but in this case there is not much of a difference. 
+
+So let's look at the reults.
+
+```{r esults='asis'}
+match_table<- matched[[8]]$matched
+
+final_result<- data.frame(
+  nr= student_preferences$nr[match_table$nr], 
+  ID= student_preferences$ID[match_table$nr], 
+  adviser= advisers$ID[match_table$adviser],
+  topic = match_table$topic, 
+  weight = match_table$value
+)
+
+f_result <- final_result[order(final_result$weight),]
+
+knitr::kable(f_result, col.names= names(f_result), row.names=FALSE, caption="Individul weights for best matching", align="l")
+```
+
+## Per adviser
+
+Next look at some other details of the matching.
+
+```{r}
+
+diag1 <- aggregate(final_result[,3], 
+                   by=list(final_result$adviser), 
+                   FUN=length)
+names(diag1)<- c("ID", "nr_students")
+diag1<- merge(advisers, diag1, by="ID")
+
+knitr::kable(diag1, caption="Adviser load", align="l")
+
+
+##### check languages
+
+diag2<- final_result[order(final_result$adviser, 
+                           final_result$topic,
+                           final_result$weight), 
+                     c(3:4, 1:2,5)]
+diag2$scr_lang <- student_preferences$scr_lang[diag2$nr]
+diag2$wg_lang <- student_preferences$wg_lang[diag2$nr]
+
+knitr::kable(diag2, row.names=FALSE, 
+             caption= "Students by adviser", align="l")                 
+```
+
+Lets repeat this final overview per workgroup.
+
+```{r results='asis'}
+wg_list <- list(1:2, 3:4, 5:6, 7:8, 9)
+wg_lang <- c("EN", rep("NL", 3), "EN")
+
+for ( jj in 1:5){
+  tabl <- final_result[final_result$topic %in% wg_list[[jj]], c("nr", "ID")]
+  names(tabl)[2] <- "Stud_ID"
+  tabl$topic <- topics$ID[final_result$topic[tabl$nr]]
+  tabl$pref_scr_lang <- student_preferences$scr_lang[tabl$nr]
+  
+  tabl<- tabl[order(tabl$topic, tabl$nr), ]
+  capt=sprintf("Workgroup %d, lang= %s", jj, wg_lang[jj])
+  print(knitr::kable(tabl, row.names=FALSE, caption = capt, align="l"))
+
+}
+
+
+```
+
+
