@@ -1,20 +1,7 @@
----
-title: "Matching students to advisers 2019-09-06 data"
-output:
-  pdf_document: default
-  html_notebook: default
-  html_document:
-    df_print: paged
-date: "Processed 2019-09-09"
----
+## --- write output to log file -------------------------------------
+sink("./result_2019_09_06/match_2019_09_06.log")
 
-This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. 
-
-Algorithm on the "real" data 0f 2019-09-06.
-
-## Load software and set parameters
-
-```{r}
+## ---- load software and set parameters --------------------------------------------
 source("hungar.R")
 source("do_match.R")
 
@@ -33,14 +20,8 @@ FORBIDDEN_COMBINATION = -1000 ## what it says
 
 SQUEEZE_POWER = 1 ## default - does nothing
 
-```
 
-## Read in data
-
-The spreadsheet out of the students administartion system was not entirely correct, so had to be corrected manually. We read the csv files that already contain the corrections. 
-
-
-```{r}
+## --- read data from 09-06 ------------------------------------------------------
 # edited advisers manually
 advisers <- read.csv("./data_2019_09_06/advisers.csv", sep=";", 
                      stringsAsFactors = FALSE)
@@ -90,13 +71,8 @@ for ( i in 1:nrow(df)) {
 }
 
 
-```
 
-## Check data rules. 
-
-There are some inconsistencies, f.i. students in an English language track indicating preferences for a thesis in Dutch. The following code applies all known rules. 
-
-```{r}
+## ---- check data versus rules -------------------------------------------------
 # ------ "english tracks are only allowed to write in english analysis"
 change1 <- student_preferences$nr[student_preferences$wg_lang == "NL" &
                          student_preferences$track %in% c("FE", "DE")]
@@ -124,21 +100,13 @@ student_preferences$topic_9[changes6] <-FORBIDDEN_COMBINATION
 
 # ------ Finally remove language from track code
 student_preferences$track<- substring(student_preferences$track, 1, 1)
-```
 
+## ---- print those records ----------------------------------------------
 
-Some attrubutes were changed.
+cat("\n\n ----- checked these inconsistencies\n\n")
+print(corset1, row.names = F)
 
-```{r}
-knitr::kable(corset1, row.names = F, caption="Corrected entries")
-```
-
-
-## The matching function
-
-We want workgroups with one language, so we have to run the matching multiple times with different choices for the workgroups. 
-
-```{r}
+## --- fucntion to do matching with language choice ------------------------------------------
 fixed_lang <- function(d2,d3,d4, topics){
   topics[3:8, 4] <- c(d2,d2,d3,d3,d4,d4)
   student_topic<- student_preferences[, 3:11]
@@ -231,12 +199,11 @@ fixed_lang <- function(d2,d3,d4, topics){
 }
 
 
-```
 
-## Eight language options for all workgroups
-
-```{r}
+## ---- determine optimal langiage choice -------------------------------------
 matched <- list()
+cat("\n\n ----- determine optimal langiage choice\n\n")
+
 i<- 0
 for (d2 in c("EN", "NL"))
 for (d3 in c("EN", "NL"))
@@ -246,17 +213,8 @@ for (d4 in c("EN", "NL")){
     cat("\n", i, "-", d2,d3,d4, "-", sum(m$value))
     matched[[i]]<- list(index=paste0(d2,d3,d4), matched=m)
   }
-```
 
-## Discussion and overview of result
-
-We see that the last result is the best. For the three middle workgroups Dutch is the best workgroup language. There are various ways to check the robustness of the result, f.i. by reordering the student preferences and to see if somebody else will get assigned to a low weight topic.
-
-A second way is to alter the measured objective. That is now the sum of weights, but it could be any additive fucntion. F.i. it could be the sum of sqr roots of weights (with negative weights unchanged), etc. The function do_match can be given alternative functions. We have tried a couple, but in this case there is not much of a difference. 
-
-So let's look at the reults.
-
-```{r results='asis'}
+## ---- show results -------------------------------------------------------
 match_table<- matched[[8]]$matched
 
 final_result<- data.frame(
@@ -273,14 +231,10 @@ row.names=FALSE)
 
 f_result <- final_result[order(final_result$weight),]
 
-knitr::kable(f_result, col.names= names(f_result), row.names=FALSE, caption="Individul weights for best matching", align="l")
-```
+cat("\n\n ----- students ordered by weight\n\n")
+print(f_result, row.names=FALSE)
 
-## Per adviser
-
-Next look at some other details of the matching.
-
-```{r}
+## ------------------------------------------------------------------------
 
 diag1 <- aggregate(final_result[,3], 
                    by=list(final_result$adviser), 
@@ -288,7 +242,9 @@ diag1 <- aggregate(final_result[,3],
 names(diag1)<- c("ID", "nr_students")
 diag1<- merge(advisers, diag1, by="ID")
 
-knitr::kable(diag1, caption="Adviser load", align="l")
+cat("\n\n ----- adviser loads\n\n")
+
+print(diag1)
 
 
 ##### check languages
@@ -304,14 +260,11 @@ write.csv(diag2,
           "./result_2019_09_06/match_per_adviser.csv",
 row.names=FALSE)
 
+cat("\n\n ----- per adviser matching\n\n")
 
-knitr::kable(diag2, row.names=FALSE, 
-             caption= "Students by adviser", align="l")                 
-```
+print(diag2, row.names=FALSE)                 
 
-Lets repeat this final overview per workgroup.
-
-```{r results='asis'}
+## ----------------------------------------------------------
 wg_list <- list(1:2, 3:4, 5:6, 7:8, 9)
 wg_lang <- c("EN", rep("NL", 3), "EN")
 
@@ -323,11 +276,16 @@ for ( jj in 1:5){
   
   tabl<- tabl[order(tabl$topic, tabl$nr), ]
   capt=sprintf("Workgroup %d, lang= %s", jj, wg_lang[jj])
-  print(knitr::kable(tabl, row.names=FALSE, caption = capt, align="l"))
+  cat("\n\n -----" , capt, "\n\n")
+  
+  print(tabl, row.names=FALSE)
 
 }
 
+## --- close log file -------------------------------------
+sink()
 
-```
+## ------------------------------------------------------------------------
+
 
 

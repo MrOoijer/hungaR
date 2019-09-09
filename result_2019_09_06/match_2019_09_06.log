@@ -1,0 +1,196 @@
+
+
+ ----- checked these inconsistencies
+
+ nr      ID scr_lang wg_lang track
+  6 1279954       EN      NL    FE
+ 29 2009735       EN      NL    DE
+
+
+ ----- determine optimal langiage choice
+
+
+ 1 - EN EN EN - 179
+ 2 - EN EN NL - 291
+ 3 - EN NL EN - 279
+ 4 - EN NL NL - 293
+ 5 - NL EN EN - 230
+ 6 - NL EN NL - 330
+ 7 - NL NL EN - 326
+ 8 - NL NL NL - 332
+
+ ----- students ordered by weight
+
+ nr       ID adviser topic weight
+ 38  2013982     102     4      2
+  2  1255574     102     3      4
+ 41  2015984     102     4      5
+  1   154379     101     2      6
+ 10  2000815     105     9      6
+ 15  2002559     102     3      6
+ 22  2003734     101     2      6
+ 28  2009603     101     2      6
+ 29  2009735     101     2      6
+  6  1279954     105     9      7
+  8  2000435     102     3      7
+  9  2000527     101     1      7
+ 11  2001105     104     7      7
+ 18  2002950     102     3      7
+ 23  2003951     105     9      7
+ 24  2004318     105     9      7
+ 27  2008878     104     7      7
+ 34  2013126     105     9      7
+ 40  2015457     101     1      7
+ 42  2027800     104     7      7
+  4  1278484     104     7      8
+  5  1279806     105     9      8
+ 13  2002094     102     4      8
+ 17  2002685     105     9      8
+ 25  2004509     104     7      8
+ 26  2004929     101     1      8
+ 32  2012967     104     7      8
+ 35  2013587     104     7      8
+  3  1270230     103     6      9
+  7  1279982     105     9      9
+ 12  2001204     101     1      9
+ 14  2002268     101     2      9
+ 16  2002568     103     6      9
+ 19  2003132     103     5      9
+ 20  2003419     102     3      9
+ 21  2003715     103     6      9
+ 30  2011891     103     6      9
+ 31  2012759     103     6      9
+ 33  2013063     103     6      9
+ 36  2013651     104     8      9
+ 37  2013829     105     9      9
+ 39  2015272     104     7      9
+ 43  2031867     103     6      9
+ 44 12000167     102     3      9
+
+
+ ----- adviser loads
+
+   ID max nr_students
+1 101   9           9
+2 102   9           9
+3 103   8           8
+4 104   9           9
+5 105   9           9
+
+
+ ----- per adviser matching
+
+ adviser topic nr       ID weight scr_lang wg_lang
+     101     1  9  2000527      7       EN        
+     101     1 40  2015457      7       VE        
+     101     1 26  2004929      8       EN      EN
+     101     1 12  2001204      9       EN      EN
+     101     2  1   154379      6       EN        
+     101     2 22  2003734      6       EN        
+     101     2 28  2009603      6       EN      EN
+     101     2 29  2009735      6       EN        
+     101     2 14  2002268      9       EN      EN
+     102     3  2  1255574      4       VN        
+     102     3 15  2002559      6       VN        
+     102     3  8  2000435      7       NL      NL
+     102     3 18  2002950      7       NL        
+     102     3 20  2003419      9       NL      NL
+     102     3 44 12000167      9       NL        
+     102     4 38  2013982      2       VN        
+     102     4 41  2015984      5       VN        
+     102     4 13  2002094      8       NL      NL
+     103     5 19  2003132      9       NL        
+     103     6  3  1270230      9       NL      NL
+     103     6 16  2002568      9       NL        
+     103     6 21  2003715      9       VN        
+     103     6 30  2011891      9       VN        
+     103     6 31  2012759      9       VN        
+     103     6 33  2013063      9       NL      NL
+     103     6 43  2031867      9       NL        
+     104     7 11  2001105      7       NL      NL
+     104     7 27  2008878      7       VN        
+     104     7 42  2027800      7       NL      NL
+     104     7  4  1278484      8       NL        
+     104     7 25  2004509      8       NL      NL
+     104     7 32  2012967      8       VN      NL
+     104     7 35  2013587      8       VN        
+     104     7 39  2015272      9       VE        
+     104     8 36  2013651      9       VN        
+     105     9 10  2000815      6       EN      EN
+     105     9  6  1279954      7       EN        
+     105     9 23  2003951      7       EN      EN
+     105     9 24  2004318      7       EN      EN
+     105     9 34  2013126      7       EN      EN
+     105     9  5  1279806      8       EN      EN
+     105     9 17  2002685      8       EN        
+     105     9  7  1279982      9       EN      EN
+     105     9 37  2013829      9       EN        
+
+
+ ----- Workgroup 1, lang= EN 
+
+ nr Stud_ID                 topic pref_scr_lang
+  9 2000527 1. Do Irrational Deci            EN
+ 12 2001204 1. Do Irrational Deci            EN
+ 26 2004929 1. Do Irrational Deci            EN
+ 40 2015457 1. Do Irrational Deci            VE
+  1  154379 2. Personality Traits            EN
+ 14 2002268 2. Personality Traits            EN
+ 22 2003734 2. Personality Traits            EN
+ 28 2009603 2. Personality Traits            EN
+ 29 2009735 2. Personality Traits            EN
+
+
+ ----- Workgroup 2, lang= NL 
+
+ nr  Stud_ID                 topic pref_scr_lang
+  2  1255574 3. Reken maar! Wat te            VN
+  8  2000435 3. Reken maar! Wat te            NL
+ 15  2002559 3. Reken maar! Wat te            VN
+ 18  2002950 3. Reken maar! Wat te            NL
+ 20  2003419 3. Reken maar! Wat te            NL
+ 44 12000167 3. Reken maar! Wat te            NL
+ 13  2002094 4. Rekenangst, alleen            NL
+ 38  2013982 4. Rekenangst, alleen            VN
+ 41  2015984 4. Rekenangst, alleen            VN
+
+
+ ----- Workgroup 3, lang= NL 
+
+ nr Stud_ID                 topic pref_scr_lang
+ 19 2003132 5. Forensic psychopat            NL
+  3 1270230 6. The Dark Side of T            NL
+ 16 2002568 6. The Dark Side of T            NL
+ 21 2003715 6. The Dark Side of T            VN
+ 30 2011891 6. The Dark Side of T            VN
+ 31 2012759 6. The Dark Side of T            VN
+ 33 2013063 6. The Dark Side of T            NL
+ 43 2031867 6. The Dark Side of T            NL
+
+
+ ----- Workgroup 4, lang= NL 
+
+ nr Stud_ID                 topic pref_scr_lang
+  4 1278484 7. Sociale positie, s            NL
+ 11 2001105 7. Sociale positie, s            NL
+ 25 2004509 7. Sociale positie, s            NL
+ 27 2008878 7. Sociale positie, s            VN
+ 32 2012967 7. Sociale positie, s            VN
+ 35 2013587 7. Sociale positie, s            VN
+ 39 2015272 7. Sociale positie, s            VE
+ 42 2027800 7. Sociale positie, s            NL
+ 36 2013651 8. Sociale interactie            VN
+
+
+ ----- Workgroup 5, lang= EN 
+
+ nr Stud_ID                 topic pref_scr_lang
+  5 1279806 9. How important are             EN
+  6 1279954 9. How important are             EN
+  7 1279982 9. How important are             EN
+ 10 2000815 9. How important are             EN
+ 17 2002685 9. How important are             EN
+ 23 2003951 9. How important are             EN
+ 24 2004318 9. How important are             EN
+ 34 2013126 9. How important are             EN
+ 37 2013829 9. How important are             EN
