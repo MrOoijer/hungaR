@@ -200,9 +200,9 @@ fixed_lang <- function(d2,d3,d4, topics){
 
 
 
-## ---- determine optimal langiage choice -------------------------------------
+## ---- determine optimal language choice -------------------------------------
 matched <- list()
-cat("\n\n ----- determine optimal langiage choice\n\n")
+cat("\n\n ----- determine optimal language choice\n\n")
 
 i<- 0
 for (d2 in c("EN", "NL"))
