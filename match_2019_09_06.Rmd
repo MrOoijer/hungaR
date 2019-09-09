@@ -267,6 +267,10 @@ final_result<- data.frame(
   weight = match_table$value
 )
 
+write.csv(final_result,
+          "./result-2019-09-06/match_per_student.csv",
+row.names=FALSE)
+
 f_result <- final_result[order(final_result$weight),]
 
 knitr::kable(f_result, col.names= names(f_result), row.names=FALSE, caption="Individul weights for best matching", align="l")
@@ -295,6 +299,11 @@ diag2<- final_result[order(final_result$adviser,
                      c(3:4, 1:2,5)]
 diag2$scr_lang <- student_preferences$scr_lang[diag2$nr]
 diag2$wg_lang <- student_preferences$wg_lang[diag2$nr]
+
+write.csv(diag2,
+          "./result-2019-09-06/match_per_adviser.csv",
+row.names=FALSE)
+
 
 knitr::kable(diag2, row.names=FALSE, 
              caption= "Students by adviser", align="l")                 
